@@ -1,0 +1,46 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Forex Signal App</title>
+  <link rel="manifest" href="manifest.json" />
+  <style>
+    html,body{margin:0;height:100%;background:#0b0f14;color:#fff;font-family:system-ui}
+    #wrap{position:relative;height:100%}
+    #chart{position:absolute;inset:0}
+    #draw{position:absolute;inset:0;touch-action:none}
+    #bar{position:absolute;left:10px;bottom:10px;display:flex;gap:8px;z-index:10}
+    #top{position:absolute;left:10px;top:10px;z-index:10;display:flex;gap:8px;flex-wrap:wrap}
+    input{background:#121a24;border:1px solid #223143;color:#fff;padding:10px;border-radius:10px}
+    button{background:#1a2432;border:1px solid #2a3a52;color:#fff;padding:10px;border-radius:10px}
+    #hud{position:absolute;right:10px;top:10px;color:#9fb3c8;font-size:12px}
+  </style>
+</head>
+<body>
+<div id="wrap">
+  <div id="chart"></div>
+  <canvas id="draw"></canvas>
+
+  <div id="top">
+    <input id="api" placeholder="Backend URL (дараа)" />
+    <input id="pair" value="XAU/USD" />
+    <input id="tf" value="15m" />
+    <button onclick="loadCandles()">Load</button>
+    <button onclick="askAnalysis()">Analyze</button>
+  </div>
+
+  <div id="bar">
+    <button onclick="setTool('line')">Line</button>
+    <button onclick="setTool('rect')">Box</button>
+    <button onclick="setTool('text')">Text</button>
+    <button onclick="undo()">Undo</button>
+  </div>
+
+  <div id="hud">Ready</div>
+</div>
+
+<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
