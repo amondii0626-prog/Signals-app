@@ -1,46 +1,121 @@
 <!doctype html>
-<html>
+<html lang="mn">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Forex Signal App</title>
-  <link rel="manifest" href="manifest.json" />
+  <title>Signals App</title>
+
   <style>
-    html,body{margin:0;height:100%;background:#0b0f14;color:#fff;font-family:system-ui}
-    #wrap{position:relative;height:100%}
-    #chart{position:absolute;inset:0}
-    #draw{position:absolute;inset:0;touch-action:none}
-    #bar{position:absolute;left:10px;bottom:10px;display:flex;gap:8px;z-index:10}
-    #top{position:absolute;left:10px;top:10px;z-index:10;display:flex;gap:8px;flex-wrap:wrap}
-    input{background:#121a24;border:1px solid #223143;color:#fff;padding:10px;border-radius:10px}
-    button{background:#1a2432;border:1px solid #2a3a52;color:#fff;padding:10px;border-radius:10px}
-    #hud{position:absolute;right:10px;top:10px;color:#9fb3c8;font-size:12px}
+    body {
+      margin: 0;
+      background: #0b0f14;
+      color: #e5e7eb;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    .wrap {
+      max-width: 720px;
+      margin: auto;
+      padding: 20px;
+    }
+    .card {
+      background: #111827;
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 0 0 1px #1f2937;
+    }
+    h2 { margin-top: 0; }
+    label {
+      font-size: 12px;
+      opacity: .8;
+      display: block;
+      margin-top: 12px;
+    }
+    input, select {
+      width: 100%;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid #1f2937;
+      background: #0b0f14;
+      color: #e5e7eb;
+      font-size: 16px;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .btns {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    button {
+      flex: 1;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid #1f2937;
+      background: #1f2937;
+      color: #e5e7eb;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button:hover { filter: brightness(1.1); }
+    pre {
+      margin-top: 14px;
+      padding: 12px;
+      border-radius: 12px;
+      background: #020617;
+      border: 1px solid #1f2937;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 14px;
+    }
   </style>
 </head>
+
 <body>
-<div id="wrap">
-  <div id="chart"></div>
-  <canvas id="draw"></canvas>
+  <div class="wrap">
+    <h2>📊 Trading Signals</h2>
 
-  <div id="top">
-    <input id="api" placeholder="Backend URL (дараа)" />
-    <input id="pair" value="XAU/USD" />
-    <input id="tf" value="15m" />
-    <button onclick="loadCandles()">Load</button>
-    <button onclick="askAnalysis()">Analyze</button>
+    <div class="card">
+      <label>Backend URL</label>
+      <input id="backendUrl" placeholder="https://signals-backend-xxxx.onrender.com" />
+
+      <div class="row">
+        <div>
+          <label>Symbol</label>
+          <select id="symbol">
+            <option>XAUUSD</option>
+            <option>XAGUSD</option>
+            <option>BTCUSD</option>
+            <option>EURUSD</option>
+            <option>GBPUSD</option>
+            <option>USDJPY</option>
+          </select>
+        </div>
+        <div>
+          <label>Timeframe</label>
+          <select id="timeframe">
+            <option>1m</option>
+            <option>5m</option>
+            <option selected>15m</option>
+            <option>30m</option>
+            <option>1h</option>
+            <option>4h</option>
+            <option>1d</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="btns">
+        <button onclick="saveBackend()">Load</button>
+        <button onclick="analyze()">Analyze</button>
+      </div>
+
+      <pre id="result">Ready.</pre>
+    </div>
   </div>
 
-  <div id="bar">
-    <button onclick="setTool('line')">Line</button>
-    <button onclick="setTool('rect')">Box</button>
-    <button onclick="setTool('text')">Text</button>
-    <button onclick="undo()">Undo</button>
-  </div>
-
-  <div id="hud">Ready</div>
-</div>
-
-<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
-<script src="app.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
