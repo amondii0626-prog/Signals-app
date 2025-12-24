@@ -1,0 +1,8 @@
+{
+  "name": "Forex Signal App",
+  "short_name": "Signal",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0b0f14",
+  "theme_color": "#0b0f14"
+}
