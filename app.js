@@ -1,246 +1,136 @@
-// ====== Helpers ======
+// ===== Helpers =====
 const $ = (id) => document.getElementById(id);
 
-function log(obj) {
-  if (typeof obj === "string") {
-    $("output").textContent = obj;
-  } else {
-    $("output").textContent = JSON.stringify(obj, null, 2);
-  }
+function setOut(msg, cls = "") {
+  const el = $("out");
+  el.className = cls;
+  el.textContent = msg;
 }
 
-function normBaseUrl(url) {
-  let u = (url || "").trim();
-  if (!u) return "";
-  // remove trailing slash
+function normalizeBackendUrl(raw) {
+  let u = (raw || "").trim();
+
+  // Add https if missing
+  if (u && !/^https?:\/\//i.test(u)) u = "https://" + u;
+
+  // Remove trailing slash
   u = u.replace(/\/+$/, "");
+
+  // Detect common typos
+  if (u.includes(".onrender.con")) {
+    throw new Error("Backend URL буруу байна: '.con' биш '.com' байх ёстой.\nЖишээ: https://signals-backend-su0a.onrender.com");
+  }
+  if (u.includes(".onrender.cc")) {
+    throw new Error("Backend URL буруу байна: '.cc' биш '.com' байх ёстой.\nЖишээ: https://signals-backend-su0a.onrender.com");
+  }
+
   return u;
 }
 
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
-// ====== Chart setup ======
-let chart, series;
-let priceLines = [];
-
-function initChart() {
-  const el = $("chart");
-  chart = LightweightCharts.createChart(el, {
-    layout: {
-      background: { type: "solid", color: "transparent" },
-      textColor: "rgba(229,231,235,0.9)",
-      fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, Arial",
-    },
-    grid: {
-      vertLines: { color: "rgba(255,255,255,0.06)" },
-      horzLines: { color: "rgba(255,255,255,0.06)" },
-    },
-    timeScale: { timeVisible: true, secondsVisible: false },
-    rightPriceScale: { borderColor: "rgba(255,255,255,0.10)" },
-    crosshair: { mode: 0 },
+async function fetchJson(url, opts = {}) {
+  const res = await fetch(url, {
+    ...opts,
+    headers: { "Accept": "application/json", ...(opts.headers || {}) },
   });
 
-  series = chart.addCandlestickSeries({
-    upColor: "#22c55e",
-    downColor: "#ef4444",
-    wickUpColor: "#22c55e",
-    wickDownColor: "#ef4444",
-    borderVisible: false,
-  });
+  const text = await res.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch {}
 
-  // initial dummy candles so chart isn't empty
-  const now = Math.floor(Date.now() / 1000);
-  const base = 2000;
-  const data = [];
-  for (let i = 60; i >= 1; i--) {
-    const t = now - i * 60;
-    const o = base + Math.sin(i / 6) * 2;
-    const c = base + Math.sin((i + 1) / 6) * 2;
-    const h = Math.max(o, c) + 1.2;
-    const l = Math.min(o, c) - 1.2;
-    data.push({ time: t, open: o, high: h, low: l, close: c });
+  if (!res.ok) {
+    const detail = data ? JSON.stringify(data, null, 2) : text;
+    throw new Error(`HTTP ${res.status} ${res.statusText}\n${detail}`);
   }
-  series.setData(data);
-
-  window.addEventListener("resize", () => {
-    chart.applyOptions({ width: el.clientWidth, height: el.clientHeight });
-  });
+  return data ?? {};
 }
 
-function clearPriceLines() {
-  try {
-    priceLines.forEach((pl) => series.removePriceLine(pl));
-  } catch (e) {}
-  priceLines = [];
-}
-
-function addLevelLine(price, title, color) {
-  const pl = series.createPriceLine({
-    price,
-    color,
-    lineWidth: 2,
-    lineStyle: 2,
-    axisLabelVisible: true,
-    title,
-  });
-  priceLines.push(pl);
-}
-
-function drawSignal(signal) {
-  clearPriceLines();
-
-  const trend = (signal.trend || "").toUpperCase();
-  const entry = Number(signal.entry);
-  const sl = Number(signal.stop_loss);
-  const tp = Number(signal.take_profit);
-
-  if (Number.isFinite(entry)) addLevelLine(entry, `ENTRY ${entry}`, "#3b82f6");
-  if (Number.isFinite(sl)) addLevelLine(sl, `SL ${sl}`, "#ef4444");
-  if (Number.isFinite(tp)) addLevelLine(tp, `TP ${tp}`, "#22c55e");
-
-  // marker
-  const now = Math.floor(Date.now() / 1000);
-  const marker = {
-    time: now,
-    position: trend === "BUY" ? "belowBar" : "aboveBar",
-    color: trend === "BUY" ? "#22c55e" : "#ef4444",
-    shape: trend === "BUY" ? "arrowUp" : "arrowDown",
-    text: `${trend || "SIGNAL"} ${Number.isFinite(entry) ? entry : ""}`,
-  };
-  series.setMarkers([marker]);
-}
-
-// ====== Backend calls ======
-let supportedSymbols = ["XAUUSD"];
-let supportedTF = ["15m"];
-
-function fillSelect(selectEl, values, fallback) {
+function fillSelect(selectEl, items, fallback) {
   selectEl.innerHTML = "";
-  (values && values.length ? values : fallback).forEach((v) => {
+  const arr = (items && items.length ? items : fallback);
+
+  for (const v of arr) {
     const opt = document.createElement("option");
     opt.value = v;
     opt.textContent = v;
     selectEl.appendChild(opt);
-  });
+  }
 }
 
-async function loadBackendMeta() {
-  const baseUrl = normBaseUrl($("api").value);
-  if (!baseUrl) {
-    alert("Backend URL оруулна уу.");
-    return;
-  }
+// ===== Chart (optional simple) =====
+let chart, series;
+function initChart() {
+  if (chart) return;
+  chart = LightweightCharts.createChart($("chart"), {
+    layout: { background: { type: "solid", color: "#0b0f14" }, textColor: "#cbd5e1" },
+    grid: { vertLines: { visible: false }, horzLines: { visible: false } },
+    timeScale: { timeVisible: true },
+    rightPriceScale: { borderVisible: false },
+  });
+  series = chart.addLineSeries();
+  // Placeholder line
+  const now = Math.floor(Date.now() / 1000);
+  series.setData([
+    { time: now - 300, value: 1 },
+    { time: now - 200, value: 1.2 },
+    { time: now - 100, value: 0.9 },
+    { time: now, value: 1.1 },
+  ]);
+}
+initChart();
 
-  localStorage.setItem("backend_url", baseUrl);
+// ===== App State =====
+let backend = "";
 
-  log("Loading backend metadata... (Render Free бол эхний удаа удаж магадгүй)");
+const FALLBACK_SYMBOLS = ["XAUUSD", "XAGUSD", "BTCUSD", "EURUSD", "GBPUSD", "USDJPY"];
+const FALLBACK_TF = ["5m", "15m", "30m", "1h", "4h", "1d"];
+
+fillSelect($("pair"), FALLBACK_SYMBOLS, FALLBACK_SYMBOLS);
+fillSelect($("tf"), FALLBACK_TF, FALLBACK_TF);
+
+// ===== Actions =====
+window.loadBackend = async function loadBackend() {
   $("btnLoad").disabled = true;
+  $("btnAnalyze").disabled = true;
 
   try {
-    // root endpoint
-    const r = await fetch(baseUrl + "/", { method: "GET" });
-    const txt = await r.text();
+    backend = normalizeBackendUrl($("api").value);
+    setOut("⏳ Backend metadata уншиж байна... (эхний удаа 10–50 сек байж болно)", "warn");
 
-    let meta;
-    try {
-      meta = JSON.parse(txt);
-    } catch {
-      meta = { raw: txt };
-    }
+    const meta = await fetchJson(`${backend}/`);
 
-    // tolerate different keys
-    supportedSymbols = meta.supported_symbols || meta.symbols || supportedSymbols;
-    supportedTF = meta.supported_timeframes || meta.timeframes || supportedTF;
+    const symbols = meta.supported_symbols || meta.symbols || [];
+    const tfs = meta.supported_timeframes || meta.timeframes || [];
 
-    fillSelect($("pair"), supportedSymbols, ["XAUUSD", "BTCUSD", "XAGUSD", "EURUSD"]);
-    fillSelect($("tf"), supportedTF, ["15m", "30m", "1h", "4h", "1d"]);
+    fillSelect($("pair"), symbols, FALLBACK_SYMBOLS);
+    fillSelect($("tf"), tfs, FALLBACK_TF);
 
-    log({
-      ok: true,
-      message: "Loaded backend metadata. Одоо Analyze дар.",
-      backend: baseUrl,
-      supported_symbols: supportedSymbols,
-      supported_timeframes: supportedTF,
-    });
+    setOut("✅ Loaded backend metadata.\nОдоо Analyze дар.", "ok");
+    $("btnAnalyze").disabled = false;
   } catch (e) {
-    log({ ok: false, error: String(e) });
-    alert("Load алдаа: " + e);
+    setOut("❌ Load амжилтгүй.\n\n" + (e?.message || String(e)), "bad");
   } finally {
     $("btnLoad").disabled = false;
   }
-}
+};
 
-async function analyze() {
-  const baseUrl = normBaseUrl($("api").value);
-  if (!baseUrl) {
-    alert("Backend URL оруулна уу.");
-    return;
-  }
-
-  const symbol = $("pair").value || "XAUUSD";
-  const tf = $("tf").value || "15m";
-
-  localStorage.setItem("backend_url", baseUrl);
-  localStorage.setItem("symbol", symbol);
-  localStorage.setItem("tf", tf);
-
+window.askAnalysis = async function askAnalysis() {
   $("btnAnalyze").disabled = true;
-  log(`Analyzing: ${symbol} ${tf} ...`);
-
   try {
-    // IMPORTANT: /analyze is GET with query params
-    const url = `${baseUrl}/analyze?symbol=${encodeURIComponent(symbol)}&tf=${encodeURIComponent(tf)}`;
-    const r = await fetch(url, { method: "GET" });
-    const txt = await r.text();
-
-    let data;
-    try {
-      data = JSON.parse(txt);
-    } catch {
-      data = { raw: txt };
+    if (!backend) {
+      backend = normalizeBackendUrl($("api").value);
     }
 
-    // If backend returned FastAPI error like {"detail":"Not Found"} or {"detail":[...]}
-    if (data && data.detail) {
-      log(data);
-      alert("Backend error: " + JSON.stringify(data));
-      return;
-    }
+    const symbol = $("pair").value || "XAUUSD";
+    const tf = $("tf").value || "15m";
 
-    // normalize numeric rounding
-    if (data.entry != null) data.entry = Number(data.entry);
-    if (data.stop_loss != null) data.stop_loss = Number(data.stop_loss);
-    if (data.take_profit != null) data.take_profit = Number(data.take_profit);
+    setOut(`⏳ Analyze хийж байна...\n${backend}/analyze?symbol=${encodeURIComponent(symbol)}&tf=${encodeURIComponent(tf)}`, "warn");
 
-    log(data);
-    drawSignal(data);
+    const data = await fetchJson(`${backend}/analyze?symbol=${encodeURIComponent(symbol)}&tf=${encodeURIComponent(tf)}`);
+
+    setOut("✅ Result:\n" + JSON.stringify(data, null, 2), "ok");
   } catch (e) {
-    log({ ok: false, error: String(e) });
-    alert("Analyze алдаа: " + e);
+    setOut("❌ Analyze амжилтгүй.\n\n" + (e?.message || String(e)), "bad");
   } finally {
     $("btnAnalyze").disabled = false;
   }
-}
-
-// ====== Init ======
-initChart();
-
-// restore saved values
-(function restore() {
-  const savedUrl = localStorage.getItem("backend_url");
-  const savedSym = localStorage.getItem("symbol");
-  const savedTf = localStorage.getItem("tf");
-
-  if (savedUrl) $("api").value = savedUrl;
-
-  fillSelect($("pair"), supportedSymbols, ["XAUUSD", "BTCUSD", "XAGUSD", "EURUSD"]);
-  fillSelect($("tf"), supportedTF, ["15m", "30m", "1h", "4h", "1d"]);
-
-  if (savedSym) $("pair").value = savedSym;
-  if (savedTf) $("tf").value = savedTf;
-})();
-
-$("btnLoad").addEventListener("click", loadBackendMeta);
-$("btnAnalyze").addEventListener("click", analyze);
+};
