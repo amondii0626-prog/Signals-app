@@ -1,98 +1,103 @@
-const DEFAULT_SYMBOLS = ["XAUUSD","BTCUSD","EURUSD","GBPUSD","USDJPY","US30","NAS100","SPX500"];
-const DEFAULT_TIMEFRAMES = ["1m","5m","15m","30m","1h","4h"];
+const $ = (id) => document.getElementById(id);
 
-const apiInput = document.getElementById("api");
-const pairSelect = document.getElementById("pair");
-const tfSelect = document.getElementById("tf");
-const btnLoad = document.getElementById("btnLoad");
-const btnAnalyze = document.getElementById("btnAnalyze");
-const out = document.getElementById("out");
-const jsStatus = document.getElementById("jsStatus");
+const statusEl = $("jsStatus");
+const outEl = $("out");
 
-// Risk calc inputs (байхгүй бол алдаа гаргахгүйгээр шалгана)
-const entryInp = document.getElementById("entry");
-const slInp = document.getElementById("sl");
+const apiInput = $("api");
+const pairSel = $("pair");
+const tfSel = $("tf");
 
-function init() {
-  jsStatus.textContent = "JS: loaded ✅";
+const btnLoad = $("btnLoad");
+const btnAnalyze = $("btnAnalyze");
 
-  pairSelect.innerHTML = "";
-  DEFAULT_SYMBOLS.forEach((s) => {
-    const opt = document.createElement("option");
-    opt.value = s;
-    opt.textContent = s;
-    pairSelect.appendChild(opt);
-  });
-
-  tfSelect.innerHTML = "";
-  DEFAULT_TIMEFRAMES.forEach((t) => {
-    const opt = document.createElement("option");
-    opt.value = t;
-    opt.textContent = t;
-    tfSelect.appendChild(opt);
-  });
-}
-init();
-
-function safeText(html) {
-  out.innerHTML = html;
+function setStatus(ok, msg) {
+  statusEl.textContent = msg;
+  statusEl.style.opacity = "1";
 }
 
-btnLoad.onclick = async () => {
-  const api = apiInput.value.trim().replace(/\/+$/, ""); // төгсгөлийн /-уудыг авч хаяна
-  out.textContent = "Checking backend...";
+function showError(err) {
+  outEl.innerHTML = `<div class="bad">API error: ${err}</div>`;
+}
 
+function showJson(obj) {
+  outEl.innerHTML = `<div class="ok">✅ Result:</div><pre>${JSON.stringify(obj, null, 2)}</pre>`;
+}
+
+async function fetchJson(url) {
+  const res = await fetch(url, { method: "GET" });
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(`${res.status} ${txt}`);
+  }
+  return await res.json();
+}
+
+function fillSelect(selectEl, arr, placeholder = "Select...") {
+  selectEl.innerHTML = "";
+  const opt0 = document.createElement("option");
+  opt0.value = "";
+  opt0.textContent = placeholder;
+  selectEl.appendChild(opt0);
+
+  for (const v of arr) {
+    const opt = document.createElement("option");
+    opt.value = v;
+    opt.textContent = v;
+    selectEl.appendChild(opt);
+  }
+}
+
+function getBaseApi() {
+  let base = (apiInput.value || "").trim();
+  if (base.endsWith("/")) base = base.slice(0, -1);
+  return base;
+}
+
+async function loadLists() {
   try {
-    const res = await fetch(api + "/health", { cache: "no-store" });
-    if (!res.ok) throw new Error("Backend not responding");
-    const data = await res.json();
-    safeText(`✅ Backend OK<br><small>${api}/health → ${JSON.stringify(data)}</small>`);
+    setStatus(true, "JS: loading...");
+    const base = getBaseApi();
+
+    // ✅ backend дээр /symbols, /timeframes нэмсэн учраас ингэж авна
+    const sym = await fetchJson(`${base}/symbols`);
+    const tfs = await fetchJson(`${base}/timeframes`);
+
+    fillSelect(pairSel, sym.symbols, "Symbol");
+    fillSelect(tfSel, tfs.timeframes, "Timeframe");
+
+    // default сонголт (дуртайгаа өөрчилж болно)
+    pairSel.value = sym.symbols.includes("XAUUSD") ? "XAUUSD" : sym.symbols[0];
+    tfSel.value = tfs.timeframes.includes("15m") ? "15m" : tfs.timeframes[0];
+
+    setStatus(true, "JS: loaded ✅");
+    outEl.textContent = "Ready.";
   } catch (e) {
-    safeText(`<span style="color:#ff6b6b">API error: ${e.message}</span>`);
+    setStatus(false, "JS: error ❌");
+    showError(e.message);
   }
-};
+}
 
-btnAnalyze.onclick = async () => {
-  const api = apiInput.value.trim().replace(/\/+$/, "");
-  const symbol = pairSelect.value;
-  const tf = tfSelect.value;
-
-  if (!api || !symbol || !tf) {
-    safeText(`<span style="color:#ff6b6b">Fill all fields</span>`);
-    return;
-  }
-
-  safeText(`Analyzing...<br><small>Sending → symbol=${symbol}, timeframe=${tf}</small>`);
-
+async function analyze() {
   try {
-    // Query params-ийг баталгаатай encode хийе
-    const url = `${api}/analyze?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(tf)}`;
+    const base = getBaseApi();
+    const symbol = pairSel.value;
+    const tf = tfSel.value;
 
-    const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) {
-      const t = await res.text().catch(() => "");
-      throw new Error(`Analyze failed (${res.status}) ${t}`);
+    if (!symbol || !tf) {
+      showError("Symbol болон Timeframe сонго.");
+      return;
     }
 
-    const data = await res.json();
-
-    // Backend буцаасан timeframe сонгосонтой зөрвөл анхааруулна
-    const warn =
-      data.timeframe && data.timeframe !== tf
-        ? `<div style="color:#ffcc00;font-size:12px;margin-top:6px">
-            ⚠ Backend timeframe зөрж байна: selected=${tf}, returned=${data.timeframe}
-           </div>`
-        : "";
-
-    safeText(
-      `✅ Result:<pre>${JSON.stringify(data, null, 2)}</pre>${warn}`
-    );
-
-    // Autofill
-    if (entryInp) entryInp.value = data.entry ?? "";
-    if (slInp) slInp.value = data.stop_loss ?? "";
-
+    // ✅ query param-аа tf гэж явуулж байна (backend tf/timeframe хоёуланг нь дэмжинэ)
+    const data = await fetchJson(`${base}/analyze?symbol=${encodeURIComponent(symbol)}&tf=${encodeURIComponent(tf)}`);
+    showJson(data);
   } catch (e) {
-    safeText(`<span style="color:#ff6b6b">API error: ${e.message}</span>`);
+    showError(e.message);
   }
-};
+}
+
+btnLoad.addEventListener("click", loadLists);
+btnAnalyze.addEventListener("click", analyze);
+
+// Page нээгдэхэд нэг удаа автоматаар load хийж болно
+loadLists();
