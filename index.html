@@ -1,56 +1,138 @@
 <!doctype html>
-<html lang="mn">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Signals App</title>
+  <title>Trading Signals</title>
+  <link rel="manifest" href="manifest.json" />
   <style>
-    body{margin:0;background:#0b0f14;color:#e5e7eb;font-family:system-ui,-apple-system,sans-serif}
-    .wrap{max-width:720px;margin:auto;padding:18px}
-    .card{background:#111827;border-radius:16px;padding:16px;box-shadow:0 0 0 1px #1f2937}
-    h2{margin:0 0 12px 0}
-    label{font-size:12px;opacity:.8;display:block;margin-top:12px}
-    input,select{width:100%;padding:12px;border-radius:12px;border:1px solid #1f2937;background:#0b0f14;color:#e5e7eb;font-size:16px}
-    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    .btns{display:flex;gap:10px;margin-top:14px}
-    button{flex:1;padding:12px;border-radius:12px;border:1px solid #1f2937;background:#1f2937;color:#e5e7eb;font-size:16px;cursor:pointer}
-    button:hover{filter:brightness(1.1)}
-    pre{margin-top:14px;padding:12px;border-radius:12px;background:#020617;border:1px solid #1f2937;white-space:pre-wrap;word-break:break-word;font-size:14px}
-    .hint{font-size:12px;opacity:.8;margin-top:10px;line-height:1.4}
+    :root {
+      --bg: #0b0f14;
+      --panel: #121a24;
+      --panel2: #0f1620;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --border: rgba(255,255,255,0.08);
+      --btn: rgba(255,255,255,0.08);
+      --btn2: rgba(255,255,255,0.12);
+      --radius: 16px;
+    }
+    html, body { height:100%; margin:0; background:var(--bg); color:var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+    #wrap { position:relative; height:100%; }
+    header { padding:14px 14px 0 14px; font-size:28px; font-weight:800; display:flex; gap:10px; align-items:center; }
+    header span { font-size:28px; }
+    #panel {
+      margin: 10px 14px 14px 14px;
+      background: linear-gradient(180deg, var(--panel), var(--panel2));
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.35);
+    }
+    .row { display:flex; gap:10px; flex-wrap:wrap; }
+    .field { width:100%; margin-top:10px; }
+    label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; }
+    input, select {
+      width:100%;
+      padding: 14px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.03);
+      color: var(--text);
+      outline: none;
+      font-size: 16px;
+    }
+    select { appearance:none; }
+    .col { flex:1; min-width:140px; }
+    .btnrow { display:flex; gap:10px; margin-top:12px; }
+    button {
+      flex:1;
+      padding: 14px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: var(--btn);
+      color: var(--text);
+      font-size: 16px;
+      font-weight: 700;
+    }
+    button:active { transform: scale(0.99); }
+    .hint { margin-top:10px; color: var(--muted); font-size: 14px; line-height:1.35; }
+    #output {
+      margin-top: 12px;
+      background: rgba(0,0,0,0.35);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 14px;
+      white-space: pre-wrap;
+      overflow:auto;
+    }
+    #chartBox {
+      margin: 0 14px 14px 14px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow:hidden;
+      height: 42vh;
+      min-height: 280px;
+      position: relative;
+    }
+    #chart { height: 100%; width: 100%; }
+    #badge {
+      position:absolute;
+      top:10px; left:10px;
+      background: rgba(0,0,0,.5);
+      border: 1px solid var(--border);
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      color: var(--muted);
+      z-index: 5;
+    }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <h2>📊 Trading Signals</h2>
-    <div class="card">
-      <label>Backend URL</label>
-      <input id="backendUrl" placeholder="https://signals-backend-xxxx.onrender.com" />
+  <div id="wrap">
+    <header>📊 <span>Trading Signals</span></header>
 
-      <div class="row">
-        <div>
+    <div id="panel">
+      <div class="field">
+        <label>Backend URL</label>
+        <input id="api" placeholder="https://signals-backend-xxxx.onrender.com" />
+      </div>
+
+      <div class="row" style="margin-top:10px;">
+        <div class="col">
           <label>Symbol</label>
-          <select id="symbol"></select>
+          <select id="pair"></select>
         </div>
-        <div>
+        <div class="col">
           <label>Timeframe</label>
-          <select id="timeframe"></select>
+          <select id="tf"></select>
         </div>
       </div>
 
-      <div class="btns">
-        <button onclick="saveBackend()">Load</button>
-        <button onclick="analyze()">Analyze</button>
+      <div class="btnrow">
+        <button id="btnLoad">Load</button>
+        <button id="btnAnalyze">Analyze</button>
       </div>
 
       <div class="hint">
-        ✅ Load дарсны дараа Analyze хийнэ.<br/>
-        Backend нь унтарсан байвал эхний request ~50 сек хүлээлгэнэ (Render Free).
+        ✅ <b>Load</b> дарсны дараа <b>Analyze</b> хийнэ.<br/>
+        ⏳ Render Free бол backend унтарсан байвал эхний request ~50 сек удааширч болно.
       </div>
 
-      <pre id="result">Ready.</pre>
+      <div id="output">Ready.</div>
     </div>
-  </div>
 
-  <script src="app.js"></script>
+    <div id="chartBox">
+      <div id="badge">Chart</div>
+      <div id="chart"></div>
+    </div>
+
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <script src="app.js"></script>
+  </div>
 </body>
 </html>
