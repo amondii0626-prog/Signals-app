@@ -1,30 +1,64 @@
 const resultBox = document.getElementById("result");
+const symbolSel = document.getElementById("symbol");
+const tfSel = document.getElementById("timeframe");
 
 function setResult(text) {
   resultBox.textContent = text;
 }
 
+function normalizeBaseUrl(u) {
+  return (u || "").trim().replace(/\/$/, "");
+}
+
 function saveBackend() {
-  const url = document.getElementById("backendUrl").value.trim().replace(/\/$/, "");
+  const url = normalizeBaseUrl(document.getElementById("backendUrl").value);
   if (!url) {
     alert("Backend URL оруулна уу");
     return;
   }
   localStorage.setItem("backendUrl", url);
-  setResult("✅ Backend saved:\n" + url);
+  setResult("✅ Backend saved:\n" + url + "\n\nОдоо Analyze дар.");
+  loadMeta(); // supported symbols/timeframes татна
 }
 
-function loadSavedBackend() {
-  const saved = localStorage.getItem("backendUrl");
-  if (saved) {
-    document.getElementById("backendUrl").value = saved;
-    setResult("✅ Loaded backend:\n" + saved);
+function fillSelect(selectEl, items, defaultValue) {
+  selectEl.innerHTML = "";
+  items.forEach(v => {
+    const opt = document.createElement("option");
+    opt.value = v;
+    opt.textContent = v;
+    if (v === defaultValue) opt.selected = true;
+    selectEl.appendChild(opt);
+  });
+}
+
+async function loadMeta() {
+  const baseUrl =
+    normalizeBaseUrl(document.getElementById("backendUrl").value) ||
+    localStorage.getItem("backendUrl");
+
+  if (!baseUrl) return;
+
+  try {
+    setResult("⏳ Loading supported symbols/timeframes...\n" + baseUrl + "/");
+    const res = await fetch(baseUrl + "/");
+    const data = await res.json();
+
+    const symbols = data.supported_symbols || ["XAUUSD"];
+    const tfs = data.supported_timeframes || ["15m"];
+
+    fillSelect(symbolSel, symbols, "XAUUSD");
+    fillSelect(tfSel, tfs, "15m");
+
+    setResult("✅ Loaded backend metadata.\nОдоо Analyze дар.");
+  } catch (e) {
+    setResult("⚠️ Backend metadata уншиж чадсангүй.\n" + e.message);
   }
 }
 
 async function analyze() {
   const baseUrl =
-    document.getElementById("backendUrl").value.trim().replace(/\/$/, "") ||
+    normalizeBaseUrl(document.getElementById("backendUrl").value) ||
     localStorage.getItem("backendUrl");
 
   if (!baseUrl) {
@@ -32,10 +66,10 @@ async function analyze() {
     return;
   }
 
-  const symbol = document.getElementById("symbol").value;
-  const tf = document.getElementById("timeframe").value;
+  const symbol = symbolSel.value || "XAUUSD";
+  const tf = tfSel.value || "15m";
 
-  const url = `${baseUrl}/analyze?symbol=${symbol}&tf=${tf}`;
+  const url = `${baseUrl}/analyze?symbol=${encodeURIComponent(symbol)}&tf=${encodeURIComponent(tf)}`;
 
   try {
     setResult("⏳ Analyzing...\n" + url);
@@ -47,4 +81,14 @@ async function analyze() {
   }
 }
 
-window.onload = loadSavedBackend;
+window.onload = () => {
+  const saved = localStorage.getItem("backendUrl");
+  if (saved) {
+    document.getElementById("backendUrl").value = saved;
+    loadMeta();
+  } else {
+    // default lists (backend байхгүй үед)
+    fillSelect(symbolSel, ["XAUUSD","XAGUSD","BTCUSD","EURUSD","GBPUSD","USDJPY"], "XAUUSD");
+    fillSelect(tfSel, ["1m","5m","15m","30m","1h","4h","1d"], "15m");
+  }
+};
