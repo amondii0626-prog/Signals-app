@@ -1,8 +1,15 @@
 {
-  "name": "Forex Signal App",
-  "short_name": "Signal",
+  "name": "Trading Signals",
+  "short_name": "Signals",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#0b0f14",
-  "theme_color": "#0b0f14"
+  "theme_color": "#0b0f14",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2942/2942813.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
 }
