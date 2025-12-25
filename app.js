@@ -1,94 +1,68 @@
-const resultBox = document.getElementById("result");
-const symbolSel = document.getElementById("symbol");
-const tfSel = document.getElementById("timeframe");
+let chart, series;
 
-function setResult(text) {
-  resultBox.textContent = text;
-}
-
-function normalizeBaseUrl(u) {
-  return (u || "").trim().replace(/\/$/, "");
-}
-
-function saveBackend() {
-  const url = normalizeBaseUrl(document.getElementById("backendUrl").value);
-  if (!url) {
-    alert("Backend URL оруулна уу");
-    return;
-  }
-  localStorage.setItem("backendUrl", url);
-  setResult("✅ Backend saved:\n" + url + "\n\nОдоо Analyze дар.");
-  loadMeta(); // supported symbols/timeframes татна
-}
-
-function fillSelect(selectEl, items, defaultValue) {
-  selectEl.innerHTML = "";
-  items.forEach(v => {
-    const opt = document.createElement("option");
-    opt.value = v;
-    opt.textContent = v;
-    if (v === defaultValue) opt.selected = true;
-    selectEl.appendChild(opt);
+function initChart() {
+  chart = LightweightCharts.createChart(document.getElementById("chart"), {
+    layout: { background: { color: "#0b0f14" }, textColor: "#d1d4dc" },
+    grid: { vertLines: { color: "#1f2933" }, horzLines: { color: "#1f2933" } },
+    timeScale: { timeVisible: true, secondsVisible: false }
   });
+
+  series = chart.addCandlestickSeries();
 }
 
-async function loadMeta() {
-  const baseUrl =
-    normalizeBaseUrl(document.getElementById("backendUrl").value) ||
-    localStorage.getItem("backendUrl");
+initChart();
 
-  if (!baseUrl) return;
-
-  try {
-    setResult("⏳ Loading supported symbols/timeframes...\n" + baseUrl + "/");
-    const res = await fetch(baseUrl + "/");
-    const data = await res.json();
-
-    const symbols = data.supported_symbols || ["XAUUSD"];
-    const tfs = data.supported_timeframes || ["15m"];
-
-    fillSelect(symbolSel, symbols, "XAUUSD");
-    fillSelect(tfSel, tfs, "15m");
-
-    setResult("✅ Loaded backend metadata.\nОдоо Analyze дар.");
-  } catch (e) {
-    setResult("⚠️ Backend metadata уншиж чадсангүй.\n" + e.message);
-  }
+async function loadCandles() {
+  document.getElementById("hud").innerText = "⏳ Backend-тэй холбогдож байна...";
+  setTimeout(() => {
+    document.getElementById("hud").innerText = "✅ Loaded backend metadata.\nОдоо Analyze дар.";
+  }, 1000);
 }
 
-async function analyze() {
-  const baseUrl =
-    normalizeBaseUrl(document.getElementById("backendUrl").value) ||
-    localStorage.getItem("backendUrl");
+async function askAnalysis() {
+  const api = document.getElementById("api").value.trim();
+  const pair = document.getElementById("pair").value;
+  const tf = document.getElementById("tf").value;
 
-  if (!baseUrl) {
-    alert("Backend URL оруулаад Load дарна уу");
+  if (!api.startsWith("http")) {
+    alert("❌ Backend URL буруу байна");
     return;
   }
 
-  const symbol = symbolSel.value || "XAUUSD";
-  const tf = tfSel.value || "15m";
+  document.getElementById("hud").innerText = "📊 Analyze хийж байна...";
 
-  const url = `${baseUrl}/analyze?symbol=${encodeURIComponent(symbol)}&tf=${encodeURIComponent(tf)}`;
+  const res = await fetch(
+    `${api}/analyze?symbol=${pair}&tf=${tf}`
+  );
+  const data = await res.json();
 
-  try {
-    setResult("⏳ Analyzing...\n" + url);
-    const res = await fetch(url);
-    const data = await res.json();
-    setResult(JSON.stringify(data, null, 2));
-  } catch (err) {
-    setResult("❌ ERROR:\n" + err.message);
-  }
+  showSignal(data);
+  drawLevels(data);
 }
 
-window.onload = () => {
-  const saved = localStorage.getItem("backendUrl");
-  if (saved) {
-    document.getElementById("backendUrl").value = saved;
-    loadMeta();
-  } else {
-    // default lists (backend байхгүй үед)
-    fillSelect(symbolSel, ["XAUUSD","XAGUSD","BTCUSD","EURUSD","GBPUSD","USDJPY"], "XAUUSD");
-    fillSelect(tfSel, ["1m","5m","15m","30m","1h","4h","1d"], "15m");
-  }
-};
+function showSignal(d) {
+  const color = d.trend === "BUY" ? "#16a34a" : "#dc2626";
+
+  document.getElementById("hud").innerHTML = `
+    <div style="padding:10px;border-radius:10px;background:#020617">
+      <b>${d.symbol} (${d.timeframe})</b><br/>
+      <span style="color:${color};font-size:18px">${d.trend}</span><br/>
+      Entry: ${d.entry}<br/>
+      SL: ${d.stop_loss}<br/>
+      TP: ${d.take_profit}<br/>
+      Confidence: ${d.confidence}
+    </div>
+  `;
+}
+
+function drawLevels(d) {
+  series.setMarkers([
+    {
+      time: Math.floor(Date.now() / 1000),
+      position: d.trend === "BUY" ? "belowBar" : "aboveBar",
+      color: d.trend === "BUY" ? "#16a34a" : "#dc2626",
+      shape: d.trend === "BUY" ? "arrowUp" : "arrowDown",
+      text: `${d.trend} @ ${d.entry}`
+    }
+  ]);
+}
