@@ -1,69 +1,51 @@
 <!doctype html>
-<html lang="mn">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Trading Signals</title>
+
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0b0f14" />
   <style>
     :root{color-scheme:dark}
-    html,body{margin:0;height:100%;background:#0b0f14;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
-    #wrap{position:relative;min-height:100vh}
-    #panel{
-      width:min(720px, calc(100% - 24px));
-      margin: 18px auto;
-      background:rgba(16,22,30,.92);
-      border:1px solid rgba(255,255,255,.08);
-      border-radius:18px;
-      padding:14px;
-      backdrop-filter: blur(8px);
-      box-sizing:border-box;
-    }
-    h1{margin:0 0 12px 0;font-size:28px;display:flex;gap:10px;align-items:center}
+    body{margin:0;height:100vh;background:#0b0f14;color:#e7eef7;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
+    #wrap{max-width:920px;margin:0 auto;padding:14px}
+    #panel{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:14px 14px 10px}
+    h1{margin:0 0 10px;display:flex;gap:10px;align-items:center;font-size:22px}
     .row{display:flex;gap:10px;flex-wrap:wrap}
-    label{opacity:.75;font-size:13px;margin-left:6px}
-    input,select,button{
-      background:#121a24;color:#fff;border:1px solid rgba(255,255,255,.10);
-      border-radius:14px;padding:12px 12px;font-size:16px;outline:none
-    }
-    input{flex:1;min-width:260px}
-    select{min-width:160px}
-    button{min-width:140px;font-weight:800;cursor:pointer}
-    button:disabled{opacity:.55;cursor:not-allowed}
-    #hint{opacity:.85;margin:10px 2px 0 2px;line-height:1.35}
-    #out{
-      margin-top:12px;
-      padding:12px;border-radius:14px;
-      background:#0c1320;border:1px solid rgba(255,255,255,.08);
-      white-space:pre-wrap;word-break:break-word;
-      min-height:54px
-    }
+    input,select,button{background:#0c1320;border:1px solid rgba(255,255,255,.10);color:#e7eef7;border-radius:14px;padding:12px 12px;font-size:15px;outline:none}
+    input{flex:1;min-width:240px}
+    select{min-width:140px}
+    button{cursor:pointer;padding:12px 18px;font-weight:650}
+    button:active{transform:translateY(1px)}
+    .hint{opacity:.85;line-height:1.35;margin:10px 0 0}
+    .pill{display:inline-block;padding:6px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);font-size:12px;opacity:.9}
     .ok{color:#7CFF9B}
     .bad{color:#FF7C7C}
     .warn{color:#FFD27C}
-    .small{opacity:.7;font-size:13px}
-    .pill{
-      display:inline-block;
-      padding:6px 10px;
-      border-radius:999px;
-      border:1px solid rgba(255,255,255,.10);
-      background:rgba(255,255,255,.04);
-      font-size:12px;
-      opacity:.85;
-    }
+    .small{opacity:.75;font-size:13px}
+    #out{margin-top:12px;padding:12px;border-radius:14px;background:#0c1320;border:1px solid rgba(255,255,255,.10);white-space:pre-wrap;word-break:break-word}
+    #chartWrap{margin-top:12px;border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,.08);background:#070a0f}
+    #chart{height:360px}
+    #tools{margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .box{margin-top:12px;padding:12px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)}
+    .box h3{margin:0 0 10px;font-size:16px}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .grid .full{grid-column:1/-1}
+    .k{opacity:.75;font-size:12px;margin-top:6px}
+    #riskOut{margin-top:10px;padding:10px;border-radius:14px;background:#0c1320;border:1px solid rgba(255,255,255,.10);white-space:pre-wrap}
   </style>
-  <link rel="manifest" href="manifest.json" />
-<meta name="theme-color" content="#0b0f14" />
-<link rel="apple-touch-icon" href="icon-192.png" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 </head>
+
 <body>
   <div id="wrap">
     <div id="panel">
       <h1>📊 Trading Signals</h1>
 
-      <div class="small" style="margin-bottom:6px">
+      <div class="small" style="margin-bottom:8px">
         <span class="pill" id="jsStatus">JS: loading...</span>
+        <span class="pill" id="ntfStatus">🔔 Notify: off</span>
       </div>
 
       <div class="row" style="margin-bottom:10px">
@@ -72,163 +54,65 @@
 
       <div class="row" style="margin-bottom:10px">
         <div style="display:flex;flex-direction:column;gap:6px">
-          <label>Symbol</label>
+          <label class="small">Symbol</label>
           <select id="pair"></select>
         </div>
-
         <div style="display:flex;flex-direction:column;gap:6px">
-          <label>Timeframe</label>
+          <label class="small">Timeframe</label>
           <select id="tf"></select>
         </div>
-
-        <button id="btnLoad">Load</button>
-        <button id="btnAnalyze">Analyze</button>
+        <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+          <button id="btnLoad">Load</button>
+          <button id="btnAnalyze">Analyze</button>
+          <button id="btnNotify">Enable Notify</button>
+        </div>
       </div>
 
-      <div id="hint">
+      <div class="hint small" id="hint">
         ✅ Load дарсны дараа Analyze хийнэ.<br/>
-        ⏳ Render Free дээр backend унтарсан байвал эхний request ~50 сек удааширч болно.
+        ⏳ Render Free дээр backend унтсан байвал эхний request ~50 сек удааширч болно.
       </div>
 
       <div id="out">Ready.</div>
+
+      <div id="chartWrap">
+        <div id="chart"></div>
+      </div>
+
+      <div class="box">
+        <h3>🧮 Risk Calculator</h3>
+        <div class="grid">
+          <div>
+            <label class="small">Balance ($)</label>
+            <input id="bal" inputmode="decimal" placeholder="10000" />
+            <div class="k">Ж: 10000</div>
+          </div>
+          <div>
+            <label class="small">Risk (%)</label>
+            <input id="riskPct" inputmode="decimal" placeholder="1" />
+            <div class="k">Ж: 1 (1%)</div>
+          </div>
+          <div>
+            <label class="small">Entry</label>
+            <input id="entry" inputmode="decimal" placeholder="auto from Analyze" />
+          </div>
+          <div>
+            <label class="small">Stop Loss</label>
+            <input id="sl" inputmode="decimal" placeholder="auto from Analyze" />
+          </div>
+          <div class="full">
+            <button id="btnCalc">Calculate Lot Size</button>
+            <div id="riskOut">—</div>
+            <div class="k">Тайлбар: XAUUSD=100 oz/lot, Forex=100,000 units/lot гэж тооцоолж байна (ерөнхий стандарт).</div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 
-<script>
-(() => {
-  const $ = (id) => document.getElementById(id);
-
-  const FALLBACK_SYMBOLS = ["XAUUSD","XAGUSD","BTCUSD","EURUSD","GBPUSD","USDJPY"];
-  const FALLBACK_TF = ["5m","15m","30m","1h","4h","1d"];
-
-  let backend = "";
-
-  function setOut(msg, cls="") {
-    const el = $("out");
-    el.className = cls;
-    el.textContent = msg;
-  }
-
-  function fillSelect(el, items, fallback) {
-    el.innerHTML = "";
-    const arr = (Array.isArray(items) && items.length) ? items : fallback;
-    for (const v of arr) {
-      const opt = document.createElement("option");
-      opt.value = v;
-      opt.textContent = v;
-      el.appendChild(opt);
-    }
-  }
-
-  function normalizeBackendUrl(raw) {
-    let u = (raw || "").trim();
-
-    // зарим утаснаас санамсаргүй "(" ороод байдаг – цэвэрлэнэ
-    u = u.replace(/\s+/g, "");
-    u = u.replace(/[()]/g, "");
-
-    if (u && !/^https?:\/\//i.test(u)) u = "https://" + u;
-    u = u.replace(/\/+$/, "");
-
-    if (!u) throw new Error("Backend URL хоосон байна.");
-
-    // буруу домэйнүүдийг барина
-    if (u.includes(".onrender.con")) {
-      throw new Error("❌ Backend URL буруу байна: '.con' биш '.com' байх ёстой.\n✅ Жишээ: https://signals-backend-su0a.onrender.com");
-    }
-    if (u.includes(".onrender.cc")) {
-      throw new Error("❌ Backend URL буруу байна: '.cc' биш '.com' байх ёстой.\n✅ Жишээ: https://signals-backend-su0a.onrender.com");
-    }
-    // хамгийн бага шалгалт
-    if (!u.includes(".onrender.com")) {
-      // өөр домэйн байж болно, гэхдээ хамгийн бага зөвлөмж өгье
-      // throw хийхгүй, зөвхөн анхааруулна
-    }
-    return u;
-  }
-
-  async function fetchJson(url, timeoutMs = 60000) {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), timeoutMs);
-
-    try {
-      const res = await fetch(url, {
-        method: "GET",
-        headers: { "Accept": "application/json" },
-        signal: ctrl.signal,
-      });
-
-      const text = await res.text();
-      let data = null;
-      try { data = text ? JSON.parse(text) : null; } catch {}
-
-      if (!res.ok) {
-        const detail = data ? JSON.stringify(data, null, 2) : text;
-        throw new Error(`HTTP ${res.status} ${res.statusText}\n${detail}`);
-      }
-      return data ?? {};
-    } finally {
-      clearTimeout(t);
-    }
-  }
-
-  async function loadBackend() {
-    $("btnLoad").disabled = true;
-    $("btnAnalyze").disabled = true;
-
-    try {
-      backend = normalizeBackendUrl($("api").value);
-      setOut("⏳ Backend metadata уншиж байна...\n(эхний удаа 10–50 сек байж болно)", "warn");
-
-      const meta = await fetchJson(`${backend}/`, 65000);
-
-      const symbols = meta.supported_symbols || meta.symbols || [];
-      const tfs = meta.supported_timeframes || meta.timeframes || [];
-
-      fillSelect($("pair"), symbols, FALLBACK_SYMBOLS);
-      fillSelect($("tf"), tfs, FALLBACK_TF);
-
-      setOut("✅ Loaded backend metadata.\nОдоо Analyze дар.", "ok");
-      $("btnAnalyze").disabled = false;
-    } catch (e) {
-      setOut("❌ Load амжилтгүй.\n\n" + (e?.message || String(e)), "bad");
-    } finally {
-      $("btnLoad").disabled = false;
-    }
-  }
-
-  async function askAnalysis() {
-    $("btnAnalyze").disabled = true;
-
-    try {
-      if (!backend) backend = normalizeBackendUrl($("api").value);
-
-      const symbol = $("pair").value || "XAUUSD";
-      const tf = $("tf").value || "15m";
-
-      setOut(`⏳ Analyze хийж байна...\n${backend}/analyze?symbol=${encodeURIComponent(symbol)}&tf=${encodeURIComponent(tf)}`, "warn");
-
-      const data = await fetchJson(`${backend}/analyze?symbol=${encodeURIComponent(symbol)}&tf=${encodeURIComponent(tf)}`, 65000);
-
-      setOut("✅ Result:\n" + JSON.stringify(data, null, 2), "ok");
-    } catch (e) {
-      setOut("❌ Analyze амжилтгүй.\n\n" + (e?.message || String(e)), "bad");
-    } finally {
-      $("btnAnalyze").disabled = false;
-    }
-  }
-
-  // Init UI
-  fillSelect($("pair"), FALLBACK_SYMBOLS, FALLBACK_SYMBOLS);
-  fillSelect($("tf"), FALLBACK_TF, FALLBACK_TF);
-
-  $("btnLoad").addEventListener("click", loadBackend);
-  $("btnAnalyze").addEventListener("click", askAnalysis);
-
-  // JS ажиллаж эхэлснийг UI дээр харуулна
-  $("jsStatus").textContent = "JS: ✅ loaded";
-})();
-</script>
-
+  <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+  <!-- cache bust -->
+  <script src="app.js?v=13"></script>
 </body>
 </html>
