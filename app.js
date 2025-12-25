@@ -1,19 +1,19 @@
 // Helper
 const $ = (id) => document.getElementById(id);
 
-// Elements (ID нь index.html дээрхтэй 100% таарах ёстой)
+// Elements (index.html-тэй ТААРСАН ID-ууд)
 const statusEl = $("jsStatus");
 const outEl = $("out");
 
 const apiInput = $("api");
-const pairSel = $("pairSel"); // ✅ зөв ID: pairSel
-const tfSel = $("tf");        // ✅ зөв ID: tf
+const pairSel = $("pair"); // ✅ index.html дээр id="pair"
+const tfSel = $("tf");     // ✅ index.html дээр id="tf"
 
 const btnLoad = $("btnLoad");
 const btnAnalyze = $("btnAnalyze");
 
 // UI helpers
-function setStatus(ok, msg) {
+function setStatus(msg) {
   if (statusEl) statusEl.textContent = msg;
 }
 
@@ -22,65 +22,61 @@ function showError(err) {
 }
 
 function showJson(obj) {
-  outEl.innerHTML = `<div class="ok">✅ Result:</div><pre>${JSON.stringify(obj, null, 2)}</pre>`;
+  outEl.innerHTML =
+    `<div class="ok">✅ Result:</div><pre>${JSON.stringify(obj, null, 2)}</pre>`;
 }
 
 async function fetchJson(url) {
-  const res = await fetch(url, { method: "GET" });
-  if (!res.ok) {
-    const txt = await res.text();
-    throw new Error(`${res.status} ${txt}`);
-  }
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(res.status);
   return await res.json();
 }
 
-function fillSelect(selectEl, arr, placeholder = "Select...") {
-  if (!selectEl) return;
+function fillSelect(sel, arr, placeholder) {
+  if (!sel) return;
+  sel.innerHTML = "";
 
-  selectEl.innerHTML = "";
-  const opt0 = document.createElement("option");
-  opt0.value = "";
-  opt0.textContent = placeholder;
-  selectEl.appendChild(opt0);
+  const p = document.createElement("option");
+  p.value = "";
+  p.textContent = placeholder;
+  sel.appendChild(p);
 
   for (const v of arr) {
-    const opt = document.createElement("option");
-    opt.value = v;
-    opt.textContent = v;
-    selectEl.appendChild(opt);
+    const o = document.createElement("option");
+    o.value = v;
+    o.textContent = v;
+    sel.appendChild(o);
   }
 }
 
 function getBaseApi() {
-  let base = (apiInput?.value || "").trim();
-  if (!base) return "";
-  if (base.endsWith("/")) base = base.slice(0, -1);
-  return base;
+  let b = apiInput.value.trim();
+  if (b.endsWith("/")) b = b.slice(0, -1);
+  return b;
 }
 
-// Load symbols/timeframes
+// Load symbols + timeframes
 async function loadLists() {
   try {
-    setStatus(true, "JS: loading...");
+    setStatus("JS: loading...");
     outEl.textContent = "Loading...";
 
     const base = getBaseApi();
-    if (!base) throw new Error("API URL хоосон байна");
+    if (!base) throw new Error("API URL хоосон");
 
-    const sym = await fetchJson(`${base}/symbols`);
+    const symbols = await fetchJson(`${base}/symbols`);
     const tfs = await fetchJson(`${base}/timeframes`);
 
-    fillSelect(pairSel, sym.symbols || [], "Symbol");
-    fillSelect(tfSel, tfs.timeframes || [], "Timeframe");
+    fillSelect(pairSel, symbols.symbols, "Symbol");
+    fillSelect(tfSel, tfs.timeframes, "Timeframe");
 
-    // default сонголт
-    if (sym.symbols?.includes("XAUUSD")) pairSel.value = "XAUUSD";
-    if (tfs.timeframes?.includes("15m")) tfSel.value = "15m";
+    pairSel.value = "XAUUSD";
+    tfSel.value = "15m";
 
+    setStatus("JS: loaded ✅");
     outEl.textContent = "Ready.";
-    setStatus(true, "JS: loaded ✅");
   } catch (e) {
-    setStatus(false, "JS: error ❌");
+    setStatus("JS: error ❌");
     showError(e.message);
   }
 }
@@ -89,19 +85,17 @@ async function loadLists() {
 async function analyze() {
   try {
     const base = getBaseApi();
-    if (!base) throw new Error("API URL хоосон байна");
-
-    const symbol = pairSel?.value || "";
-    const tf = tfSel?.value || "";
+    const symbol = pairSel.value;
+    const tf = tfSel.value;
 
     if (!symbol || !tf) {
-      showError("Symbol болон Timeframe сонго.");
+      showError("Symbol / Timeframe сонго");
       return;
     }
 
-    // backend чинь параметр нэрийг symbol, tf гэж авдаг
-    const url = `${base}/analyze?symbol=${encodeURIComponent(symbol)}&tf=${encodeURIComponent(tf)}`;
-    const data = await fetchJson(url);
+    const data = await fetchJson(
+      `${base}/analyze?symbol=${symbol}&tf=${tf}`
+    );
     showJson(data);
   } catch (e) {
     showError(e.message);
@@ -109,8 +103,6 @@ async function analyze() {
 }
 
 // Events
-btnLoad?.addEventListener("click", loadLists);
-btnAnalyze?.addEventListener("click", analyze);
-
-// Auto load when page opens
-window.addEventListener("load", loadLists);
+btnLoad.onclick = loadLists;
+btnAnalyze.onclick = analyze;
+window.onload = loadLists;
