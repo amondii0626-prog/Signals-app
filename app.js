@@ -13,53 +13,54 @@ const btnAnalyze = $("btnAnalyze");
 function setStatus(ok, msg) {
   statusEl.textContent = msg;
   statusEl.style.opacity = "1";
-  statusEl.style.color = ok ? "#9cff9c" : "#ff8a8a";
 }
 
-function showError(msg) {
-  outEl.innerHTML = `<div class="bad">API error: ${msg}</div>`;
+function showError(err) {
+  outEl.innerHTML = `<div class="bad">API error: ${err}</div>`;
 }
 
 function showJson(obj) {
   outEl.innerHTML = `<div class="ok">✅ Result:</div><pre>${JSON.stringify(obj, null, 2)}</pre>`;
 }
 
-function getBaseApi() {
-  let base = (apiInput.value || "").trim();
-  if (!base) return "";
-  if (base.endsWith("/")) base = base.slice(0, -1);
+function normalizeBase(url) {
+  return (url || "").trim().replace(/\/+$/, "");
+}
+
+// ✅ 1 удаа бичээд хадгалах
+const LS_KEY = "signals_api_base";
+function loadSavedApi() {
+  const saved = localStorage.getItem(LS_KEY);
+  if (saved) apiInput.value = saved;
+}
+function saveApiIfValid() {
+  const base = normalizeBase(apiInput.value);
+  if (!base) return null;
+  localStorage.setItem(LS_KEY, base);
   return base;
 }
 
-// Save API base so you don't retype
-const API_KEY = "saved_api_base";
-const savedBase = localStorage.getItem(API_KEY);
-if (savedBase && apiInput) apiInput.value = savedBase;
-
-apiInput.addEventListener("change", () => {
-  const v = (apiInput.value || "").trim();
-  if (v) localStorage.setItem(API_KEY, v);
-});
-
 async function fetchJson(url) {
   const res = await fetch(url, { method: "GET" });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`${res.status} ${text}`);
-  return JSON.parse(text);
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(`${res.status} ${txt}`.trim());
+  }
+  return res.json();
 }
 
-function fillSelect(selectEl, items, placeholder = "Select...") {
-  selectEl.innerHTML = "";
+function fillSelect(sel, arr, placeholder = "Select...") {
+  sel.innerHTML = "";
   const opt0 = document.createElement("option");
   opt0.value = "";
   opt0.textContent = placeholder;
-  selectEl.appendChild(opt0);
+  sel.appendChild(opt0);
 
-  for (const v of items) {
+  for (const v of arr) {
     const opt = document.createElement("option");
     opt.value = v;
     opt.textContent = v;
-    selectEl.appendChild(opt);
+    sel.appendChild(opt);
   }
 }
 
@@ -68,16 +69,18 @@ async function loadLists() {
     setStatus(true, "JS: loading...");
     outEl.textContent = "Loading...";
 
-    const base = getBaseApi();
-    if (!base) throw new Error("API base URL хоосон байна");
+    const base = saveApiIfValid();
+    if (!base) throw new Error("API link хоосон байна");
 
+    // backend endpoints
     const syms = await fetchJson(`${base}/symbols`);
     const tfs = await fetchJson(`${base}/timeframes`);
 
     fillSelect(pairSel, syms.symbols || [], "Symbol");
     fillSelect(tfSel, tfs.timeframes || [], "Timeframe");
 
-    pairSel.value = (syms.symbols || []).includes("XAUUSD") ? "XAUUSD" : (syms.symbols || [])[0] || "";
+    // default
+    if ((syms.symbols || []).includes("XAUUSD")) pairSel.value = "XAUUSD";
     tfSel.value = (tfs.timeframes || []).includes("15m") ? "15m" : (tfs.timeframes || [])[0] || "";
 
     setStatus(true, "JS: loaded ✅");
@@ -90,45 +93,27 @@ async function loadLists() {
 
 async function analyze() {
   try {
-    const base = getBaseApi();
-    if (!base) throw new Error("API base URL хоосон байна");
+    const base = saveApiIfValid();
+    if (!base) throw new Error("API link хоосон байна");
 
     const symbol = pairSel.value;
     const tf = tfSel.value;
+
     if (!symbol || !tf) throw new Error("Symbol болон Timeframe сонго");
 
-    setStatus(true, "Analyzing...");
-    const data = await fetchJson(`${base}/analyze?symbol=${encodeURIComponent(symbol)}&tf=${encodeURIComponent(tf)}`);
+    const url = `${base}/analyze?symbol=${encodeURIComponent(symbol)}&tf=${encodeURIComponent(tf)}`;
+    const data = await fetchJson(url);
     showJson(data);
-    setStatus(true, "Done ✅");
   } catch (e) {
-    setStatus(false, "JS: error ❌");
     showError(e.message);
   }
 }
 
-// Auto quote refresh (every 2 sec)
-async function refreshQuote() {
-  try {
-    const base = getBaseApi();
-    if (!base) return;
-
-    const symbol = pairSel.value || "XAUUSD";
-    const q = await fetchJson(`${base}/quote?symbol=${encodeURIComponent(symbol)}`);
-
-    if (q.ok) {
-      // show short quote above output
-      const line = `Quote ${q.symbol}: bid=${q.bid} ask=${q.ask} (${q.source || "source"})`;
-      // keep existing output, just update status text a bit
-      setStatus(true, line);
-    }
-  } catch (e) {
-    // ignore to avoid spamming
-  }
-}
-
+// events
 btnLoad.addEventListener("click", loadLists);
 btnAnalyze.addEventListener("click", analyze);
 
-loadLists();
-setInterval(refreshQuote, 2000);
+// init
+loadSavedApi();
+setStatus(true, "JS: loaded ✅");
+outEl.textContent = "Ready.";
