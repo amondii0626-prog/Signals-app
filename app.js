@@ -1,34 +1,46 @@
-// Helper
 const $ = (id) => document.getElementById(id);
 
-// Elements (index.html-тэй ТААРСАН ID-ууд)
 const statusEl = $("jsStatus");
 const outEl = $("out");
 
 const apiInput = $("api");
-const pairSel = $("pair"); // ✅ index.html дээр id="pair"
-const tfSel = $("tf");     // ✅ index.html дээр id="tf"
+const pairSel = $("pair");
+const tfSel = $("tf");
 
 const btnLoad = $("btnLoad");
 const btnAnalyze = $("btnAnalyze");
 
-// UI helpers
+// default fallback (backend дээр /symbols, /timeframes байхгүй үед)
+const FALLBACK_SYMBOLS = ["XAUUSD", "BTCUSD", "EURUSD"];
+const FALLBACK_TFS = ["1m", "5m", "15m", "1h"];
+
 function setStatus(msg) {
   if (statusEl) statusEl.textContent = msg;
 }
 
-function showError(err) {
-  outEl.innerHTML = `<div class="bad">API error: ${err}</div>`;
+function showError(msg) {
+  if (!outEl) return;
+  outEl.innerHTML = `<div class="bad">API error: ${msg}</div>`;
 }
 
 function showJson(obj) {
-  outEl.innerHTML =
-    `<div class="ok">✅ Result:</div><pre>${JSON.stringify(obj, null, 2)}</pre>`;
+  if (!outEl) return;
+  outEl.innerHTML = `<div class="ok">✅ Result:</div><pre>${JSON.stringify(obj, null, 2)}</pre>`;
+}
+
+function getBaseApi() {
+  let b = (apiInput?.value || "").trim();
+  if (!b) b = "https://signals-backend-su0a.onrender.com"; // default
+  if (b.endsWith("/")) b = b.slice(0, -1);
+  return b;
 }
 
 async function fetchJson(url) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(res.status);
+  const res = await fetch(url, { method: "GET" });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(`${res.status}${txt ? " " + txt : ""}`);
+  }
   return await res.json();
 }
 
@@ -49,60 +61,68 @@ function fillSelect(sel, arr, placeholder) {
   }
 }
 
-function getBaseApi() {
-  let b = apiInput.value.trim();
-  if (b.endsWith("/")) b = b.slice(0, -1);
-  return b;
-}
-
-// Load symbols + timeframes
 async function loadLists() {
   try {
     setStatus("JS: loading...");
-    outEl.textContent = "Loading...";
 
     const base = getBaseApi();
-    if (!base) throw new Error("API URL хоосон");
 
-    const symbols = await fetchJson(`${base}/symbols`);
-    const tfs = await fetchJson(`${base}/timeframes`);
+    // symbols/timeframes авахыг оролдоно, болохгүй бол fallback ашиглана
+    let symbols = FALLBACK_SYMBOLS;
+    let tfs = FALLBACK_TFS;
 
-    fillSelect(pairSel, symbols.symbols, "Symbol");
-    fillSelect(tfSel, tfs.timeframes, "Timeframe");
+    try {
+      const s = await fetchJson(`${base}/symbols`);
+      symbols = s.symbols || s.data || s || FALLBACK_SYMBOLS;
+    } catch (_) {}
 
-    pairSel.value = "XAUUSD";
-    tfSel.value = "15m";
+    try {
+      const t = await fetchJson(`${base}/timeframes`);
+      tfs = t.timeframes || t.data || t || FALLBACK_TFS;
+    } catch (_) {}
+
+    fillSelect(pairSel, symbols, "Symbol");
+    fillSelect(tfSel, tfs, "Timeframe");
+
+    // default сонголтууд
+    if (pairSel && symbols.length) pairSel.value = symbols.includes("XAUUSD") ? "XAUUSD" : symbols[0];
+    if (tfSel && tfs.length) tfSel.value = tfs.includes("15m") ? "15m" : tfs[0];
 
     setStatus("JS: loaded ✅");
-    outEl.textContent = "Ready.";
+    if (outEl) outEl.textContent = "Ready.";
   } catch (e) {
     setStatus("JS: error ❌");
     showError(e.message);
   }
 }
 
-// Analyze
+// /analyze дээр tf эсвэл timeframe аль нь таарахыг автоматаар шалгана
 async function analyze() {
   try {
     const base = getBaseApi();
-    const symbol = pairSel.value;
-    const tf = tfSel.value;
+    const symbol = pairSel?.value || "";
+    const tf = tfSel?.value || "";
 
-    if (!symbol || !tf) {
-      showError("Symbol / Timeframe сонго");
-      return;
-    }
+    if (!symbol || !tf) return showError("Symbol / Timeframe сонго");
 
-    const data = await fetchJson(
-      `${base}/analyze?symbol=${symbol}&tf=${tf}`
-    );
-    showJson(data);
+    // 1) эхлээд tf гэж үзээд үзнэ
+    try {
+      const data1 = await fetchJson(`${base}/analyze?symbol=${encodeURIComponent(symbol)}&tf=${encodeURIComponent(tf)}`);
+      return showJson(data1);
+    } catch (_) {}
+
+    // 2) дараа нь timeframe гэж үзээд үзнэ
+    const data2 = await fetchJson(`${base}/analyze?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(tf)}`);
+    return showJson(data2);
+
   } catch (e) {
     showError(e.message);
   }
 }
 
-// Events
-btnLoad.onclick = loadLists;
-btnAnalyze.onclick = analyze;
-window.onload = loadLists;
+// Button events
+btnLoad?.addEventListener("click", loadLists);
+btnAnalyze?.addEventListener("click", analyze);
+
+// DOM бүрэн ачаалсны дараа автоматаар ажиллуулна (null алдааг 100% зогсооно)
+window.addEventListener("load", loadLists);
